@@ -140,6 +140,43 @@ customers["Total_Spending"] = (
 )
 
 # ─────────────────────────────────────────
+# Modèles de prédiction (réponse aux campagnes)
+# Mêmes variables et même découpage que le notebook ml_modeling.ipynb
+# ─────────────────────────────────────────
+
+@st.cache_data
+def train_models(customers):
+    from sklearn.model_selection import train_test_split
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.ensemble import RandomForestClassifier
+    from sklearn.tree import DecisionTreeClassifier
+    from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+
+    data = customers.copy()
+    data["Income"] = data["Income"].fillna(data["Income"].mean())
+    X = data[["Income", "Age", "Total_Spending", "NumWebPurchases", "NumStorePurchases"]]
+    y = data["Response"]
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+    candidates = {
+        "Logistic Regression": LogisticRegression(max_iter=1000),
+        "Random Forest": RandomForestClassifier(random_state=42),
+        "Decision Tree": DecisionTreeClassifier(random_state=42),
+    }
+    rows = []
+    for name, model in candidates.items():
+        model.fit(X_train, y_train)
+        pred = model.predict(X_test)
+        rows.append({
+            "Modèle": name,
+            "Accuracy": accuracy_score(y_test, pred),
+            "Precision": precision_score(y_test, pred, zero_division=0),
+            "Recall": recall_score(y_test, pred),
+            "F1-Score": f1_score(y_test, pred),
+        })
+    return pd.DataFrame(rows)
+
+# ─────────────────────────────────────────
 # Sidebar — Navigation
 # ─────────────────────────────────────────
 
@@ -415,13 +452,13 @@ elif page == "Machine Learning":
 
     st.markdown("---")
 
-    models = pd.DataFrame({
-        "Modèle":    ["Logistic Regression", "Random Forest", "Decision Tree"],
-        "Accuracy":  [0.857, 0.844, 0.768],
-        "Precision": [0.831, 0.819, 0.741],
-        "Recall":    [0.812, 0.803, 0.724],
-        "F1-Score":  [0.821, 0.811, 0.732],
-    })
+    models = train_models(customers)
+
+    st.info(
+        "Métriques calculées sur le jeu de test (20 %). Precision, Recall et F1 "
+        "concernent la classe « répondants » : seulement 15 % des clients ont répondu, "
+        "donc l'accuracy seule surestime la qualité des modèles."
+    )
 
     # Métriques en colonnes
     col1, col2, col3 = st.columns(3)
@@ -441,10 +478,12 @@ elif page == "Machine Learning":
         fig, ax = plt.subplots(figsize=(8, 4.5))
         bar_colors = [PALETTE[0], PALETTE[2], PALETTE[3]]
         bars = ax.bar(models["Modèle"], models["Accuracy"], color=bar_colors, edgecolor="white", width=0.5)
-        ax.set_ylim(0.7, 0.9)
+        ax.set_ylim(0, 1)
         ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
         ax.bar_label(bars, fmt=lambda x: f"{x*100:.1f}%", padding=4, fontsize=11, fontweight="bold")
-        ax.axhline(0.80, color="gray", linestyle="--", linewidth=1, alpha=0.6, label="Baseline 80%")
+        baseline = 1 - customers["Response"].mean()
+        ax.axhline(baseline, color="gray", linestyle="--", linewidth=1, alpha=0.6,
+                   label=f"Toujours prédire « non » : {baseline:.0%}")
         ax.legend(fontsize=9)
         fig.tight_layout()
         st.pyplot(fig)
@@ -461,7 +500,7 @@ elif page == "Machine Learning":
                    width=width, label=row["Modèle"], color=bar_colors[i], edgecolor="white")
         ax.set_xticks(list(x))
         ax.set_xticklabels(metrics, fontsize=10)
-        ax.set_ylim(0.65, 0.92)
+        ax.set_ylim(0, 1)
         ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
         ax.legend(fontsize=8)
         fig.tight_layout()
