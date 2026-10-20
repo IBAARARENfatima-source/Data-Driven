@@ -172,4 +172,4 @@ Les chemins vers les données sont relatifs : les notebooks fonctionnent directe
 Projet réalisé en binôme à l'**ENSIAS** (Génie Logiciel, 2ᵉ année) :
 
 - Aya Nasser
-- *[Nom du binôme]*
+- [Fatima IBAARAREN](https://github.com/IBAARARENfatima-source)
